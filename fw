@@ -1,0 +1,82 @@
+#!/bin/bash
+
+# ./fw
+
+#set -x
+
+modprobe ip_conntrack_ftp
+
+source /root/scripts/fw/fw.config
+
+Init() {
+    # flush all standard and user defined chains
+    $ipt -F
+    $ipt -X
+    $ipt -t nat -F
+    $ipt -t nat -X
+    $ipt -t mangle -F
+    $ipt -t mangle -X
+
+    #setting policies
+    $ipt -P INPUT $1
+    $ipt -P OUTPUT $1
+    $ipt -P FORWARD $1
+    $ipt -t nat -P PREROUTING ACCEPT
+    $ipt -t nat -P OUTPUT ACCEPT
+    $ipt -t nat -P POSTROUTING ACCEPT
+    $ipt -t mangle -P PREROUTING ACCEPT
+    $ipt -t mangle -P OUTPUT ACCEPT
+}
+
+
+case "$1" in
+    start)
+        echo -e "Starting Firewall ...\n"
+	exec >> $logfile
+	exec 2>> $logfile
+	rm -f $pidfile
+	echo -e "\n"
+	echo `date`
+        echo "Starting Firewall ... "
+	( echo "Init DROP" &&
+	  Init DROP &&
+	  $fwpath/./fw.flags &&
+	  $fwpath/./fw.default &&
+	  $fwpath/./fw.rules &&
+	  touch $pidfile &&
+	  #traffic accounting per ipac-ng
+	  fetchipac -S &&
+	  echo -en "$IS_DONE" 
+	) || 
+	( Init ACCEPT &&
+	  echo -en "$IS_FAILED"
+	)
+        ;;
+
+    stop)
+	echo -e "Stopping Firewall ... \n"
+	exec >> $logfile
+	exec 2>> $logfile
+	rm -f $pidfile
+        echo "Stopping Firewall ... "
+        ( Init ACCEPT
+          echo "1" > /proc/sys/net/ipv4/ip_forward
+	  echo -en "$IS_DONE"
+	) || echo -en "$IS_FAILED"
+        ;;
+
+    status)
+	if [ -e $pidfile ] ; then echo -e "Firewall active.\n"
+ 	else echo -e "Firewall inactive.\n"
+	fi
+	;;
+
+    *)
+        echo -e "Usage: $0 start|stop|status\n"
+	exit 1
+        ;;
+esac
+
+exit 0
+
+ 

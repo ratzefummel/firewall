@@ -1,0 +1,62 @@
+#!/bin/sh
+#set -x
+# /etc/init.d/fw.default
+
+source /root/scripts/fw/fw.config
+
+echo "fw.default"
+
+#allow loopback
+$ipt -A INPUT -i $lb -s $lb_ip -d $lb_ip -j ACCEPT
+$ipt -A OUTPUT -o $lb -s $lb_ip -d $lb_ip -j ACCEPT
+
+#drop invalid packets
+$ipt -A INPUT -m state --state INVALID -j LOG --log-prefix "fw INVALID:" --log-level $loglev
+$ipt -A INPUT -m state --state INVALID -j DROP
+#$ipt -A FORWARD -m state --state INVALID -j LOG --log-prefix "fw INVALID:" --log-level $loglev
+#$ipt -A FORWARD -m state --state INVALID -j DROP
+
+#$ipt -A INPUT -m state --state UNCLEAN -j LOG --log-prefix "fw UNCLEAN:" --log-level $loglev
+#$ipt -A INPUT -m state --state UNCLEAN -j DROP
+#$ipt -A FORWARD -m state --state UNCLEAN -j LOG --log-prefix "fw UNCLEAN:" --log-level $loglev
+#$ipt -A FORWARD -m state --state UNCLEAN -j DROP
+
+#NMAP XMAS (FIN/URG/PSH) 
+$ipt -A INPUT -p tcp --tcp-flags ALL FIN,URG,PSH -m limit --limit 5/m -j LOG --log-prefix "fw NMAP: XMAS:" --log-level $loglev
+$ipt -A INPUT -p tcp --tcp-flags ALL FIN,URG,PSH -j DROP
+#$ipt -A FORWARD -p tcp --tcp-flags ALL FIN,URG,PSH -m limit --limit 5/m -j LOG --log-prefix "fw NMAP: XMAS:" --log-level $loglev
+#$ipt -A FORWARD -p tcp --tcp-flags ALL FIN,URG,PSH -j DROP
+
+#SYN,RST
+$ipt -A INPUT -p tcp --tcp-flags SYN,RST SYN,RST -m limit --limit 5/m -j LOG --log-prefix "fw SYN/RST:" --log-level $loglev
+$ipt -A INPUT -p tcp --tcp-flags SYN,RST SYN,RST -j DROP
+#$ipt -A FORWARD -p tcp --tcp-flags SYN,RST SYN,RST -m limit --limit 5/m -j LOG --log-prefix "fw SYN/RST:" --log-level $loglev
+#$ipt -A FORWARD -p tcp --tcp-flags SYN,RST SYN,RST -j DROP
+
+#SYN/FIN
+$ipt -A INPUT -p tcp --tcp-flags SYN,FIN SYN,FIN -m limit --limit 5/m -j LOG --log-prefix "fw SYN/FIN:" --log-level $loglev
+$ipt -A INPUT -p tcp --tcp-flags SYN,FIN SYN,FIN -j DROP
+#$ipt -A FORWARD -p tcp --tcp-flags SYN,FIN SYN,FIN -m limit --limit 5/m -j LOG --log-prefix "fw SYN/FIN:" --log-level $loglev
+#$ipt -A FORWARD -p tcp --tcp-flags SYN,FIN SYN,FIN -j DROP
+
+#drop tcp packets without any flags (possible NULL SCAN)
+$ipt -t mangle -A PREROUTING -p tcp --tcp-flags ALL NONE -m limit --limit 5/m -j LOG --log-prefix "fw NULL SCAN:" --log-tcp-options --log-ip-options --log-level $loglev
+$ipt -t mangle -A PREROUTING -p tcp --tcp-flags ALL NONE -j DROP 
+
+#drop fragments
+#$ipt -A INPUT -i $ext_if -f -j LOG --log-prefix "fw FRAGMENTS:" --log-level $loglev
+#$ipt -A INPUT -i $ext_if -f -j DROP
+#$ipt -A FORWARD -i $ext_if -f -j LOG --log-prefix "fw FRAGMENTS:" --log-level $loglev
+#$ipt -A FORWARD -i $ext_if -f -j DROP
+
+#new packets must be set SYN flag
+#$ipt -A INPUT -p tcp ! --syn -m state --state NEW -j LOG --log-prefix "fw NO SYN:" --log-level $loglev
+#$ipt -A INPUT -p tcp ! --syn -m state --state NEW -j DROP 
+#$ipt -A FORWARD -p tcp ! --syn -m state --state NEW -j LOG --log-prefix "fw NO SYN:" --log-level $loglev
+#$ipt -A FORWARD -p tcp ! --syn -m state --state NEW -j DROP 
+
+#drop incomming reserved ips, loopback and broadcast
+for ip in $reserved_ips; do
+    $ipt -A INPUT -i $ext_if -s $ip -j DROP
+#    $ipt -A FORWARD -i $ext_if -s $ip -j DROP 
+done

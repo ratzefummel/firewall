@@ -1,0 +1,139 @@
+#!/bin/sh
+#set -x 
+# ./fw.rules
+
+source /root/scripts/fw/fw.config
+
+echo "fw.rules ..."
+
+LocalInTcp() {
+    dev=$1 ; shift 
+    for i in $* ; do
+	$ipt -A INPUT -j ACCEPT -i $dev -p tcp --sport 1024: --dport $i -m state --state NEW,ESTABLISHED,RELATED
+	$ipt -A OUTPUT -j ACCEPT -o $dev -p tcp --sport $i --dport 1024: -m state --state ESTABLISHED,RELATED
+    done
+}
+	
+LocalOutTcp() {
+    dev=$1 ; shift
+    for i in $* ; do
+	$ipt -A INPUT -j ACCEPT -i $dev -p tcp --sport $i --dport 1024: -m state --state ESTABLISHED,RELATED
+	$ipt -A OUTPUT -j ACCEPT -o $dev -p tcp --sport 1024: --dport $i -m state --state NEW,ESTABLISHED,RELATED
+    done
+}
+
+ForwardInTcp() {
+    dev=$1 ; shift 
+    for i in $* ; do
+	$ipt -A FORWARD -j ACCEPT -i $dev -p tcp --sport 1024: --dport $i -m state --state NEW,ESTABLISHED,RELATED
+	$ipt -A FORWARD -j ACCEPT -o $dev -p tcp --sport $i --dport 1024: -m state --state ESTABLISHED,RELATED
+    done
+}
+	
+ForwardOutTcp() {
+    dev=$1 ; shift
+    for i in $* ; do
+	$ipt -A FORWARD -j ACCEPT -i $dev -p tcp --sport $i --dport 1024: -m state --state ESTABLISHED,RELATED
+	$ipt -A FORWARD -j ACCEPT -o $dev -p tcp --sport 1024: --dport $i -m state --state NEW,ESTABLISHED,RELATED
+    done
+}
+
+LocalInUdp() {
+    dev=$1 ; shift
+    for i in $* ; do
+	$ipt -A INPUT -j ACCEPT -i $dev -p udp --sport 1024: --dport $i -m state --state NEW,ESTABLISHED,RELATED
+	$ipt -A OUTPUT -j ACCEPT -o $dev -p udp --sport $i --dport 1024: -m state --state ESTABLISHED,RELATED
+    done
+}
+	
+LocalOutUdp() {
+    dev=$1 ; shift
+    for i in $* ; do
+	$ipt -A INPUT -j ACCEPT -i $dev -p udp --sport $i --dport 1024: -m state --state ESTABLISHED,RELATED
+	$ipt -A OUTPUT -j ACCEPT -o $dev -p udp --sport 1024: --dport $i -m state --state NEW,ESTABLISHED,RELATED
+    done
+}
+
+ForwardInUdp() {
+    dev=$1 ; shift
+    for i in $* ; do
+	$ipt -A FORWARD -j ACCEPT -i $dev -p udp --sport 1024: --dport $i -m state --state NEW,ESTABLISHED,RELATED
+	$ipt -A FORWARD -j ACCEPT -o $dev -p udp --sport $i --dport 1024: -m state --state ESTABLISHED,RELATED
+    done
+}
+	
+ForwardOutUdp() {
+    dev=$1 ; shift
+    for i in $* ; do
+	$ipt -A FORWARD -j ACCEPT -i $dev -p udp --sport $i --dport 1024: -m state --state ESTABLISHED,RELATED
+	$ipt -A FORWARD -j ACCEPT -o $dev -p udp --sport 1024: --dport $i -m state --state NEW,ESTABLISHED,RELATED
+    done
+}
+
+# loopback
+$ipt -A INPUT -j ACCEPT -i $lb
+$ipt -A OUTPUT -j ACCEPT -o $lb
+
+
+#ntpd
+$ipt -A INPUT -j ACCEPT -i $ext_if -p udp --sport 123 --dport 123 -m state --state ESTABLISHED,RELATED
+$ipt -A OUTPUT -j ACCEPT -o $ext_if -p udp --sport 123 --dport 123 -m state --state NEW,ESTABLISHED,RELATED
+
+#ftp-rules fuer eingehende verbindungen (balu als ftp-server)
+$ipt -A INPUT  -j ACCEPT -i $ext_if -p tcp --dport 21 -m state --state NEW,ESTABLISHED
+$ipt -A OUTPUT -j ACCEPT -o $ext_if -p tcp --sport 21 -m state --state ESTABLISHED,RELATED
+#speziell active-ftp (welch ein graus)
+$ipt -A INPUT  -j ACCEPT -i $ext_if -p tcp --dport 20 -m state --state ESTABLISHED
+$ipt -A OUTPUT -j ACCEPT -o $ext_if -p tcp --sport 20 -m state --state ESTABLISHED,RELATED
+#speziell passiv-ftp
+$ipt -A INPUT  -j ACCEPT -i $ext_if -p tcp --sport 1024: --dport 1024: -m state --state ESTABLISHED,RELATED
+$ipt -A OUTPUT -j ACCEPT -o $ext_if -p tcp --sport 1024: --dport 1024: -m state --state ESTABLISHED
+
+
+# local
+#LocalInTcp $int_if
+LocalOutTcp $int_if 22
+#LocalInUdp $int_if
+#LocalOutUdp $int_if
+LocalInTcp $ext_if 22 25 80 110 143 443 993 995 
+#21 1024:
+LocalOutTcp $ext_if 21 22 25 43 53 80 110 993 995 1024:
+#25 smtp, 993 imap/ssl, 995 pop3/ssl
+#LocalInUdp $ext_if
+LocalOutUdp $ext_if 53
+
+# forward
+#ForwardInTcp $int_if 4662
+#ForwardOutTcp $int_if 4662
+#ForwardInUdp $int_if 4662
+#ForwardOutUdp $int_if
+#ForwardInTcp $ext_if 
+#ForwardOutTcp $ext_if 21 22 25 53 80 81 110 119 123 443 993 1024: #5190 8080 4000 6112
+#ForwardInUdp $ext_if
+#ForwardOutUdp $ext_if 53
+
+
+#icmp
+$ipt -A INPUT -j ACCEPT -p icmp
+$ipt -A OUTPUT -j ACCEPT -p icmp
+#$ipt -A FORWARD -j ACCEPT -p icmp
+
+
+#keep out logs from 212.42.230.49(switch) -> 224.0.0.1  to avoid log flooding
+$ipt -A INPUT -i $ext_if -s 212.42.230.49 -d 224.0.0.1 -j DROP
+#no logs from 212.42.230.0/24:138 -> 212.42.230.255:138 (wahrscheinlich netzwerkrauschen, samba o.ae.)
+$ipt -A INPUT -i $ext_if -s 212.42.230.0/24 -d 212.42.230.255 -p udp --sport 123 --dport 123 -j DROP
+$ipt -A INPUT -i $ext_if -s 212.42.230.0/24 -d 212.42.230.255 -p udp --sport 137 --dport 137 -j DROP
+$ipt -A INPUT -i $ext_if -s 212.42.230.0/24 -d 212.42.230.255 -p udp --sport 138 --dport 138 -j DROP
+$ipt -A INPUT -i $ext_if -s 213.7.81.0/24 -d 212.42.230.124 -p udp --sport 137 --dport 137 -j DROP
+$ipt -A INPUT -i $ext_if -s 213.7.81.0/24 -d 212.42.230.124 -p udp --sport 138 --dport 138 -j DROP
+
+#eigentlich wird balu rund um die uhr auf tcp/135 bombadiert, alles blocken?
+#$ipt -A INPUT -i $ext_if -s 212.41.0.0/16 -d 212.42.230.124 -p tcp --dport 135 -j DROP
+#$ipt -A INPUT -i $ext_if -s 212.42.0.0/16 -d 212.42.230.124 -p tcp --dport 135 -j DROP
+
+# rest for logging and dropping
+$ipt -A INPUT -i $ext_if -m limit --limit 5/m -j LOG --log-prefix "fw in: " --log-level $loglev
+$ipt -A OUTPUT -o $ext_if -m limit --limit 5/m -j LOG --log-prefix "fw out: " --log-level $loglev
+#$ipt -A FORWARD -i $ext_if -m limit -j LOG --log-prefix "fw fwdin: " --log-level $loglev
+#$ipt -A FORWARD -o $ext_if -m limit -j LOG --log-prefix "fw fwdout: " --log-level $loglev

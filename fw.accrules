@@ -1,0 +1,105 @@
+#!/bin/bash
+#set -x
+# ./fw.accrules
+
+source /root/scripts/fw/fw.config
+
+echo "fw.rules ..."
+
+### ip accounting (count the bytes passed through)
+##################################################
+
+#loopback
+$ipt -N lb_in
+$ipt -N lb_out
+$ipt -A lb_in -i $lb -s $lb_ip -d $lb_ip
+$ipt -A lb_out -o $lb -s $lb_ip -d $lb_ip
+
+#lan
+$ipt -N eth_0_in
+$ipt -N eth_0_out
+$ipt -A eth_0_in -i $int_if -s $lan -d $lan
+$ipt -A eth_0_out -o $int_if -s $lan -d $lan
+
+#uni
+$ipt -N eth_1_in
+$ipt -N eth_1_out
+$ipt -A eth_1_in -i $ext_if -s "139.18.0.0/16"
+$ipt -A eth_1_out -o $ext_if -d "139.18.0.0/16"
+
+#htwk
+$ipt -N gw_in
+$ipt -N gw_out
+$ipt -A gw_in -i $ext_if -s "141.57.0.0/16"
+$ipt -A gw_out -o $ext_if -d "141.57.0.0/16"
+
+#class a
+$ipt -N class_a_in
+$ipt -N class_a_out
+$ipt -A class_a_in -i $ext_if -s $class_a
+$ipt -A class_a_out -o $ext_if -d $class_a
+
+#class b
+$ipt -N class_b_in
+$ipt -N class_b_out
+$ipt -A class_b_in -i $ext_if -s $class_b
+$ipt -A class_b_out -o $ext_if -d $class_b
+
+#class c
+$ipt -N class_c_in
+$ipt -N class_c_out
+$ipt -A class_c_in -i $ext_if -s $class_c
+$ipt -A class_c_out -o $ext_if -d $class_c
+
+#diablo :D
+#$ipt -N diablo_in
+#$ipt -N diablo_out
+#$ipt -A diablo_in -i $ext_if -s "213.248.106.0/24"
+#$ipt -A diablo_out -o $ext_if -d "213.248.106.0/24"
+
+#all (total, external traffic)
+$ipt -N all_in
+$ipt -N all_out
+$ipt -A all_in -i $ext_if
+$ipt -A all_out -o $ext_if
+
+
+# add all the new rules to standard chains
+$ipt -A INPUT -j lb_in
+$ipt -A OUTPUT -j lb_out
+
+$ipt -A INPUT -j eth_0_in
+$ipt -A OUTPUT -j lan_out
+
+$ipt -A INPUT -j eth_1_in
+$ipt -A OUTPUT -j eth_1_out
+$ipt -A FORWARD -j eth_1_in
+$ipt -A FORWARD -j eth_1_out
+
+$ipt -A INPUT -j gw_in
+$ipt -A OUTPUT -j gw_out
+$ipt -A FORWARD -j gw_in
+$ipt -A FORWARD -j gw_out
+
+$ipt -A INPUT -j class_a_in
+$ipt -A OUTPUT -j class_a_out
+$ipt -A FORWARD -j class_a_in
+$ipt -A FORWARD -j class_a_out
+
+$ipt -A INPUT -j class_b_in
+$ipt -A OUTPUT -j class_b_out
+$ipt -A FORWARD -j class_b_in
+$ipt -A FORWARD -j class_b_out
+
+$ipt -A INPUT -j class_c_in
+$ipt -A OUTPUT -j class_c_out
+$ipt -A FORWARD -j class_c_in
+$ipt -A FORWARD -j class_c_out
+#pssst ;)
+#$ipt -A FORWARD -j diablo_in
+#$ipt -A FORWARD -j diablo_out
+
+$ipt -A INPUT -j all_in
+$ipt -A OUTPUT -j all_out
+$ipt -A FORWARD -j all_in
+$ipt -A FORWARD -j all_out

@@ -1,0 +1,73 @@
+#!/bin/bash
+#set -x
+# /etc/init.d/fw.flags
+
+source /root/scripts/fw/fw.config
+
+echo "fw.flags ..."
+
+
+# Doc: linux/Documentation/filesystems/proc.txt
+#      linux/Documentation/networking/ip-sysctl.txt
+
+# deactivate (1) pong, no response for ping
+test -e /proc/sys/net/ipv4/icmp_echo_ignore_all &&
+#echo "1" > /proc/sys/net/ipv4/icmp_echo_ignore_all
+echo "0" > /proc/sys/net/ipv4/icmp_echo_ignore_all
+
+#deactivate pong for broadcast
+test -e /proc/sys/net/ipv4/icmp_echo_ignore_broadcasts &&
+#echo "1" > /proc/sys/net/ipv4/icmp_echo_ignore_broadcasts
+echo "0" > /proc/sys/net/ipv4/icmp_echo_ignore_broadcasts
+
+#deactivate source routing
+test -e /proc/sys/net/ipv4/conf/all/accept_source_route &&
+echo "0" > /proc/sys/net/ipv4/conf/all/accept_source_route
+
+#deactivate icmp redirecting
+#test -e /proc/sys/net/ipv4/conf/$ext_if/accept_redirects &&
+#echo "0" > /proc/sys/net/ipv4/conf/all/accept_redirects
+#echo "1" > /proc/sys/net/ipv4/conf/$ext_if/accept_redirects
+
+#activate bad error message protection
+test -e /proc/sys/net/ipv4/icmp_ignore_bogus_error_responses &&
+echo "1" > /proc/sys/net/ipv4/icmp_ignore_bogus_error_responses
+
+#activate reverse path filtering
+test -e /proc/sys/net/ipv4/conf/all/rp_filter &&
+echo "1" > /proc/sys/net/ipv4/conf/all/rp_filter
+
+#activate logging of spoofed, source routed and redirected packets
+test -e /proc/sys/net/ipv4/conf/all/log_martians &&
+#echo "0" > /proc/sys/net/ipv4/conf/$ext_if/log_martians &&
+#echo "0" > /proc/sys/net/ipv4/conf/$int_if/log_martians
+echo "0" > /proc/sys/net/ipv4/conf/all/log_martians
+
+#activate ip-forwarding
+test -e /proc/sys/net/ipv4/ip_forward &&
+#echo "1" > /proc/sys/net/ipv4/ip_forward
+echo "0" > /proc/sys/net/ipv4/ip_forward
+
+#maximum number of connections to track, default:2048
+#test -e /proc/sys/net/ipv4/ip_conntrack_max &&
+#echo "4096" > /proc/sys/net/ipv4/ip_conntrack_max
+
+#locale port range for TCP/UDP
+#test -e /proc/sys/net/ipv4/ip_local_port_range &&
+#echo -e "32768\t61000" > /proc/sys/net/ipv4/ip_local_port_range
+
+#deactivate TCP Explicit Congestion Notification Support ?
+#test -e /proc/sys/net/ipv4/tcp_ecn &&
+#echo "0" > /proc/sys/net/ipv4/tcp_ecn
+
+#for dialup connections with dynamic ip
+test -e /proc/sys/net/ipv4/ip_dynaddr &&
+#echo "1" > /proc/sys/net/ipv4/ip_dynaddr
+echo "0" > /proc/sys/net/ipv4/ip_dynaddr
+
+#activate SYN flooding protection
+test -e /proc/sys/net/ipv4/tcp_syncookies &&
+echo "1" > /proc/sys/net/ipv4/tcp_syncookies
+
+#script have to be executed successfully; nothing else matters whether all kernelflags could be set
+exit 0
