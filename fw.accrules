@@ -15,19 +15,19 @@ $ipt -N lb_out
 $ipt -A lb_in -i $lb -s $lb_ip -d $lb_ip
 $ipt -A lb_out -o $lb -s $lb_ip -d $lb_ip
 
-#lan
+#eth_0
 $ipt -N eth_0_in
 $ipt -N eth_0_out
 $ipt -A eth_0_in -i $int_if -s $lan -d $lan
 $ipt -A eth_0_out -o $int_if -s $lan -d $lan
 
-#uni
+#eth_1
 $ipt -N eth_1_in
 $ipt -N eth_1_out
 $ipt -A eth_1_in -i $ext_if -s "139.18.0.0/16"
 $ipt -A eth_1_out -o $ext_if -d "139.18.0.0/16"
 
-#htwk
+#gw
 $ipt -N gw_in
 $ipt -N gw_out
 $ipt -A gw_in -i $ext_if -s "141.57.0.0/16"
